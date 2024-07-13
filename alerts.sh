@@ -155,5 +155,6 @@ send_email_on_error() {
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     email=$1
-    send_email_on_error "Wallapop alert (error)" "$email" run "$email"
+    send_email_on_error "Wallapop alert (error)" "$SMTP_USER" \
+        run "$email"
 fi
