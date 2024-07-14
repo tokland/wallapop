@@ -109,7 +109,7 @@ get_token() {
     jq -n -c -r '{id: 1, method: "Page.navigate", params: {url: "https://es.wallapop.com/wall"}}' |
         websocat -n1 "$webso_url" | jq -rc >/dev/null
 
-    sleep 5
+    sleep 20
 
     debug "Get cookies"
     token=$(
