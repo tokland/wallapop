@@ -95,18 +95,16 @@ get_token() {
     local debug_url=$1
     local webso_url
 
-    debug "Continue chrome"
-    pkill -CONT chrome
-
     webso_url=$(
         curl --connect-timeout 2 -sS "$debug_url/json" |
-            jq -r '.[0] | .webSocketDebuggerUrl' |
+            jq -r '.[] | select(.url | contains("https://es.wallapop.com")) | .webSocketDebuggerUrl' |
             first_or_fail
     )
     debug "Websocket: $webso_url"
 
-    debug "Navigate to home"
-    jq -n -c -r '{id: 1, method: "Page.navigate", params: {url: "https://es.wallapop.com/wall"}}' |
+    local url="https://es.wallapop.com/wall"
+    debug "Navigate to home: $url"
+    jq -n -c -r --arg url "$url" '{id: 1, method: "Page.navigate", params: {url: $url}}' |
         websocat -n1 "$webso_url" | jq -rc >/dev/null
 
     sleep 20
@@ -120,9 +118,33 @@ get_token() {
     )
 
     debug "Token: $token"
+    echo "$token"
+}
 
-    debug "Stop chrome"
-    pkill -STOP chrome
+reload_simyo() {
+    local debug_url=$1
+    local webso_url
+
+    webso_url=$(
+        curl --connect-timeout 2 -sS "$debug_url/json" |
+            jq -r '.[] | select(.url | contains("https://www.simyo.es")) | .webSocketDebuggerUrl' |
+            first_or_fail
+    )
+    debug "Websocket: $webso_url"
+
+    debug "Navigate to home"
+    jq -n -c -r '{id: 1, method: "Page.navigate", params: {url: "https://www.simyo.es/simyo/privatearea/home"}}' |
+        websocat -n1 "$webso_url" | jq -rc >/dev/null
+
+    sleep 20
+
+    debug "Get cookies"
+    token=$(
+        echo '{"id": 1, "method": "Network.getCookies", "params": {}}' |
+            websocat "$webso_url" -n1 |
+            jq -r '.result.cookies[] | select(.name == "SESSION") | .value' |
+            first_or_fail
+    )
 
     echo "$token"
 }
@@ -132,12 +154,17 @@ run() {
     local email=$1
     local alerts
 
+    pkill -CONT chrome
+
+    #session_simyo=$(reload_simyo "http://localhost:9222") || true
     token=$(get_token "http://localhost:9222")
     alerts=$(get_alerts) || return 1
 
     if test "$alerts"; then
         echo "$alerts" | send_email "Wallapop alert" "$email"
     fi
+
+    pkill -STOP chrome
 
     debug "Done"
 }
